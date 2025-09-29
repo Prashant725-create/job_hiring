@@ -1,7 +1,7 @@
 // src/routes/Candidates.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { FixedSizeList as List } from "react-window";
+// import { FixedSizeList } from "react-window";
 
 import {
   fetchCandidates,

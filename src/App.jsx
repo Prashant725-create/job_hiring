@@ -5,8 +5,8 @@ import RootLayout from "./layouts/RootLayout";
 import Home from "./routes/Home";
 import Jobs from "./routes/Jobs";
 import JobDetail from "./routes/JobDetail";
-import Candidates from "./routes/Candidates";
-import CandidateDetail from "./routes/CandidateDetail";
+import Candidates from "./routes/candidates";
+import CandidateDetail from "./routes/candidateDetail";
 import Assessments from "./routes/Assessments";
 import Login from "./routes/Login";
 
