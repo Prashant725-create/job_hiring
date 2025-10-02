@@ -1,268 +1,331 @@
-// src/routes/Jobs.jsx
-import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+// src/routes/JobsPage.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
 import { fetchJobs, createJob, patchJob, reorderJob } from "../api/jobsApi";
-import { DndContext, closestCenter } from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  verticalListSortingStrategy,
-  useSortable
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
-/* --- helper: slugify --- */
-function makeSlug(s = "") {
-  return s.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "");
+/* ---------- helpers ---------- */
+const makeSlug = (s = "") =>
+  s.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "");
+
+function clampPage(p, pages) {
+  if (p < 1) return 1;
+  if (p > pages) return pages;
+  return p;
 }
 
-/* --- Sortable item --- */
-function SortableItem({ job, onEdit, onArchive }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: job.id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    padding: 12,
-    border: "1px solid #e8e8e8",
-    borderRadius: 8,
-    marginBottom: 8,
-    background: "#fff",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  };
+/* ---------- Job detail route (/jobs/:jobId) ---------- */
+function JobDetail({ jobs, setJobs }) {
+  const { jobId } = useParams();
+  const navigate = useNavigate();
+  const job = jobs.find((j) => j.id === jobId);
+
+  const [title, setTitle] = useState(job?.title ?? "");
+  const [tags, setTags] = useState((job?.tags || []).join(", "));
+
+  useEffect(() => {
+    if (job) {
+      setTitle(job.title);
+      setTags((job.tags || []).join(", "));
+    }
+  }, [job]);
+
+  if (!job) return <div className="p-6">Job not found</div>;
+
+  async function handleSave() {
+    const newTitle = (title || "").trim();
+    if (!newTitle) {
+      alert("Title is required");
+      return;
+    }
+    const slug = makeSlug(newTitle);
+    // local unique check
+    if (jobs.some((j) => j.slug === slug && j.id !== job.id)) {
+      alert("Slug must be unique");
+      return;
+    }
+
+    try {
+      const updated = await patchJob(job.id, { title: newTitle, slug, tags: tags.split(",").map(t => t.trim()).filter(Boolean) });
+      // update local
+      setJobs(prev => prev.map(p => p.id === updated.id ? updated : p));
+      navigate(-1);
+    } catch (err) {
+      console.error("save failed", err);
+      alert("Failed to save job");
+    }
+  }
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
-      <div style={{ textAlign: "left" }}>
-        <div style={{ fontWeight: 700 }}>{job.title}</div>
-        <div style={{ fontSize: 12, color: "#666" }}>{(job.tags || []).join(", ")}</div>
-        <div style={{ fontSize: 11, color: "#999" }}>slug: {job.slug}</div>
+    <div className="p-6 max-w-3xl mx-auto">
+      <button onClick={() => navigate(-1)} className="mb-4 px-3 py-1 bg-gray-200 rounded">← Back</button>
+      <h2 className="text-2xl font-bold mb-3">Edit job</h2>
+
+      <div className="mb-3">
+        <label className="block mb-1">Title</label>
+        <input value={title} onChange={e => setTitle(e.target.value)} className="w-full border p-2 rounded" />
       </div>
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <button onClick={() => onEdit(job)}>Edit</button>
-        <button onClick={() => onArchive(job)}>{job.status === "active" ? "Archive" : "Unarchive"}</button>
-        <span {...listeners} style={{ cursor: "grab", padding: 8 }}>☰</span>
-        <Link to={`/jobs/${job.id}`}>Open</Link>
+      <div className="mb-3">
+        <label className="block mb-1">Tags (comma separated)</label>
+        <input value={tags} onChange={e => setTags(e.target.value)} className="w-full border p-2 rounded" />
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={handleSave} className="px-3 py-1 bg-blue-600 text-white rounded">Save</button>
+        <button onClick={() => navigate(-1)} className="px-3 py-1 bg-gray-200 rounded">Cancel</button>
       </div>
     </div>
   );
 }
 
-/* --- Main Jobs component --- */
-export default function Jobs() {
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+/* ---------- Top-level IndexView (moved out of JobsPage) ---------- */
+function IndexView({
+  jobs,
+  loading,
+  search,
+  setSearch,
+  status,
+  setStatus,
+  setOpenCreate,
+  openCreate,
+  newTitle,
+  setNewTitle,
+  newTags,
+  setNewTags,
+  handleCreate,
+  toggleArchive,
+  move,
+  page,
+  pages,
+  setPage,
+}) {
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      <header className="flex items-center justify-between mb-4">
+        <h1 className="text-3xl font-bold">Jobs</h1>
+        <div>
+          <button onClick={() => setOpenCreate(true)} className="px-3 py-1 bg-blue-600 text-white rounded">+ New Job</button>
+        </div>
+      </header>
+
+      <div className="flex gap-2 mb-4">
+        <input
+          placeholder="Search title/slug"
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          className="flex-1 border p-2 rounded"
+        />
+        <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }} className="border p-2 rounded">
+          <option value="">All</option>
+          <option value="active">Active</option>
+          <option value="archived">Archived</option>
+        </select>
+      </div>
+
+      {loading ? <div>Loading…</div> : (
+        <div className="border rounded overflow-hidden">
+          {jobs.map((j, idx) => (
+            <div key={j.id} className="flex justify-between items-center p-3 border-b hover:bg-gray-50">
+              <div>
+                <Link to={`${j.id}`} className="text-blue-600 hover:underline font-semibold">{j.title}</Link>
+                <div className="text-sm text-gray-500">{(j.tags || []).join(", ")}</div>
+                <div className="text-xs text-gray-400">order: {j.order}</div>
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <button onClick={() => toggleArchive(j.id)} className="px-2 py-1 border rounded text-sm">
+                  {j.status === "active" ? "Archive" : "Unarchive"}
+                </button>
+
+                <button onClick={() => move(j.id, -1)} disabled={idx === 0} className="px-2 py-1 border rounded text-sm">↑</button>
+                <button onClick={() => move(j.id, +1)} disabled={idx === jobs.length - 1} className="px-2 py-1 border rounded text-sm">↓</button>
+              </div>
+            </div>
+          ))}
+
+          {jobs.length === 0 && <div className="p-4 text-gray-500">No jobs</div>}
+        </div>
+      )}
+
+      {/* pagination */}
+      <div className="flex justify-center items-center gap-3 mt-4">
+        <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 bg-gray-200 rounded">Prev</button>
+        <span>Page {page} of {pages}</span>
+        <button disabled={page >= pages} onClick={() => setPage(p => Math.min(pages, p + 1))} className="px-3 py-1 bg-gray-200 rounded">Next</button>
+      </div>
+
+      {/* create modal */}
+      {openCreate && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <form onSubmit={handleCreate} className="bg-white p-5 rounded shadow-md w-[420px]">
+            <h3 className="text-xl font-bold mb-3">New Job</h3>
+            <div className="mb-3">
+              <label className="block mb-1">Title</label>
+              <input value={newTitle} onChange={e => setNewTitle(e.target.value)} className="w-full border p-2 rounded" />
+            </div>
+            <div className="mb-3">
+              <label className="block mb-1">Tags (comma separated)</label>
+              <input value={newTags} onChange={e => setNewTags(e.target.value)} className="w-full border p-2 rounded" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setOpenCreate(false)} className="px-3 py-1 bg-gray-200 rounded">Cancel</button>
+              <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded">Create</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+/* ---------- Main Jobs page + index route ---------- */
+export default function JobsPage() {
+  // server-backed state
+  const [jobs, setJobs] = useState([]);
+  const [total, setTotal] = useState(0);
+
+  // UI state
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [data, setData] = useState(null); // server response { total,page,pageSize,pages,results }
-  const [items, setItems] = useState([]); // current page items (for DnD)
-  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
-  // modal & form state
-  const [openModal, setOpenModal] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [title, setTitle] = useState("");
-  const [tagsText, setTagsText] = useState("");
-  const [saving, setSaving] = useState(false);
+  // create modal
+  const [openCreate, setOpenCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newTags, setNewTags] = useState("");
 
-  // backup for optimistic reorder rollback
-  const backupRef = useRef(null);
+  // optimistic backup for reorder/archive
+  const [backup, setBackup] = useState(null);
 
+  useEffect(() => {
+    console.log("Jobs mounted");
+    return () => console.log("Jobs unmounted");
+  }, []);
+
+  // load from server (uses fetchJobs from your jobsApi.js)
   async function load() {
     setLoading(true);
     try {
-      const res = await fetchJobs({ search, status, page, pageSize });
-      setData(res);
-      setItems(res.results || []);
+      const res = await fetchJobs({ search: search || "", status: status || "", page, pageSize: PAGE_SIZE, sort: "order" });
+
+      if (!res || typeof res !== "object") throw new Error("Invalid response from server");
+      const results = Array.isArray(res) ? res : res.results;
+      if (!results) throw new Error("Response missing results");
+
+      setJobs(results);
+      setTotal(typeof res.total === "number" ? res.total : results.length);
     } catch (err) {
-      console.error(err);
-      alert("Failed to load jobs");
+      console.error("load failed", err);
+      alert("Failed to load jobs — check console/network and MSW worker.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    load();
+    void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, status]);
+  }, [search, status, page]);
 
-  /* open create modal */
-  function openCreate() {
-    setEditing(null);
-    setTitle("");
-    setTagsText("");
-    setOpenModal(true);
-  }
-
-  /* open edit modal */
-  function openEdit(job) {
-    setEditing(job);
-    setTitle(job.title || "");
-    setTagsText((job.tags || []).join(", "));
-    setOpenModal(true);
-  }
-
-  /* save (create or edit) */
-  async function handleSave(e) {
+  // create
+  async function handleCreate(e) {
     e?.preventDefault?.();
-    if (!title.trim()) {
-      alert("Title is required");
+    const title = (newTitle || "").trim();
+    if (!title) {
+      alert("Title required");
       return;
     }
     const slug = makeSlug(title);
-    setSaving(true);
+    if (jobs.some(j => j.slug === slug)) {
+      alert("Slug already exists");
+      return;
+    }
+
+    setLoading(true);
     try {
-      // client-side unique slug check (simple): search server for slug
-      const check = await fetchJobs({ search: slug, page: 1, pageSize: 1000 });
-      const conflict = (check.results || []).find(j => j.slug === slug && (!editing || j.id !== editing.id));
-      if (conflict) {
-        alert("Slug already exists. Please change title.");
-        setSaving(false);
-        return;
-      }
-
-      const payload = { title: title.trim(), tags: tagsText.split(",").map(s => s.trim()).filter(Boolean) };
-
-      if (editing) {
-        await patchJob(editing.id, payload);
-        setOpenModal(false);
-        load();
-      } else {
-        await createJob(payload);
-        setOpenModal(false);
-        setPage(1);
-        load();
-      }
+      await createJob({ title, slug, tags: newTags.split(",").map(t => t.trim()).filter(Boolean) });
+      // reload page (keeps server ordering/pagination consistent)
+      await load();
+      setOpenCreate(false);
+      setNewTitle("");
+      setNewTags("");
     } catch (err) {
-      console.error(err);
-      if (err.status === 409) alert(err.body?.message || "Slug conflict");
-      else alert(err.message || "Save failed");
+      console.error("create failed", err);
+      alert("Failed to create job");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   }
 
-  /* archive/unarchive */
-  async function toggleArchive(job) {
+  // archive/unarchive - optimistic update with rollback
+  async function toggleArchive(jobId) {
+    const prev = jobs.slice();
+    setBackup(prev);
+    const next = jobs.map(j => j.id === jobId ? { ...j, status: j.status === "active" ? "archived" : "active" } : j);
+    setJobs(next);
+
     try {
-      await patchJob(job.id, { status: job.status === "active" ? "archived" : "active" });
-      load();
+      const desired = next.find(j => j.id === jobId).status;
+      await patchJob(jobId, { status: desired });
+      setBackup(null);
     } catch (err) {
-      console.error(err);
-      alert("Failed to change status");
+      console.error("toggle archive failed", err);
+      setJobs(prev); // rollback
+      setBackup(null);
+      alert("Failed to change status — rolled back");
     }
   }
 
-  /* DnD reorder: optimistic update with rollback */
-  function onDragEnd(event) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+  // reorder (up/down) - optimistic, call reorder endpoint
+  async function move(jobId, direction) {
+    const idx = jobs.findIndex(j => j.id === jobId);
+    if (idx === -1) return;
+    const toIndex = idx + direction;
+    if (toIndex < 0 || toIndex >= jobs.length) return;
 
-    const oldIndex = items.findIndex(i => i.id === active.id);
-    const newIndex = items.findIndex(i => i.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
+    const prev = jobs.slice();
+    setBackup(prev);
 
-    const newItems = arrayMove(items, oldIndex, newIndex);
-    // optimistic
-    backupRef.current = items;
-    setItems(newItems);
+    const next = [...jobs];
+    const [moving] = next.splice(idx, 1);
+    next.splice(toIndex, 0, moving);
+    // assign new order locally (1-based)
+    const withOrder = next.map((j, i) => ({ ...j, order: i + 1 }));
+    setJobs(withOrder);
 
-    // call server: toOrder is 1-based position
-    reorderJob(active.id, newIndex + 1)
-      .then(() => {
-        // refresh to get server canonical order (and updated order numbers)
-        load();
-        backupRef.current = null;
-      })
-      .catch(err => {
-        console.error("reorder failed", err);
-        // rollback
-        setItems(backupRef.current || items);
-        backupRef.current = null;
-        alert("Reorder failed — rolled back");
-      });
+    try {
+      // server expects 1-based toOrder
+      await reorderJob(jobId, toIndex + 1);
+      setBackup(null);
+    } catch (err) {
+      console.error("reorder failed", err);
+      setJobs(prev); // rollback
+      setBackup(null);
+      alert("Failed to reorder — rolled back");
+    }
   }
 
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  
+
+  // wire routes (index + /:jobId)
   return (
-    <div style={{ padding: 20 }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2>Jobs</h2>
-        <div>
-          <button onClick={openCreate}>+ New Job</button>
-        </div>
-      </header>
-
-      <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-        <input
-          placeholder="Search title or slug"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ padding: 8 }}
-        />
-        <select value={status} onChange={e => setStatus(e.target.value)} style={{ padding: 8 }}>
-          <option value="">All</option>
-          <option value="active">Active</option>
-          <option value="archived">Archived</option>
-        </select>
-        <button onClick={() => { setPage(1); load(); }}>Apply</button>
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        {loading ? (
-          <div>Loading...</div>
-        ) : (
-          <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
-              {items.map(job => (
-                <SortableItem key={job.id} job={job} onEdit={openEdit} onArchive={toggleArchive} />
-              ))}
-            </SortableContext>
-          </DndContext>
-        )}
-      </div>
-
-      <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>Prev</button>
-        <div style={{ padding: "0 8px" }}>
-          Page {page}{data ? ` / ${data.pages || 1}` : ""}
-        </div>
-        <button onClick={() => setPage(p => Math.min((data?.pages || Infinity), p + 1))} disabled={data && page >= data.pages}>Next</button>
-      </div>
-
-      {/* Create/Edit modal */}
-      {openModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
-        }}>
-          <form onSubmit={handleSave} style={{ background: "#fff", padding: 20, borderRadius: 8, width: 520 }}>
-            <h3>{editing ? "Edit Job" : "New Job"}</h3>
-
-            <div style={{ display: "grid", gap: 8 }}>
-              <label>
-                Title
-                <input value={title} onChange={e => setTitle(e.target.value)} style={{ width: "100%", padding: 8 }} />
-              </label>
-
-              <label>
-                Tags (comma-separated)
-                <input value={tagsText} onChange={e => setTagsText(e.target.value)} style={{ width: "100%", padding: 8 }} />
-              </label>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button type="button" onClick={() => setOpenModal(false)} disabled={saving}>Cancel</button>
-                <button type="submit" disabled={saving}>{saving ? "Saving..." : (editing ? "Save" : "Create")}</button>
-              </div>
-            </div>
-          </form>
-        </div>
-      )}
-
-      <div style={{ marginTop: 16 }}>
-        <Link to="/">← Back to home</Link>
-      </div>
-    </div>
+    <Routes>
+      <Route
+        index
+        element={
+          <IndexView
+            jobs={jobs} loading={loading} search={search} setSearch={setSearch} status={status} setStatus={setStatus} setOpenCreate={setOpenCreate} openCreate={openCreate} newTitle={newTitle} setNewTitle={setNewTitle} newTags={newTags} setNewTags={setNewTags} handleCreate={handleCreate} toggleArchive={toggleArchive} move={move} page={page} pages={pages} setPage={setPage}
+          />
+        }
+      />
+      <Route path=":jobId" element={<JobDetail jobs={jobs} setJobs={setJobs} />} />
+    </Routes>
   );
+
 }

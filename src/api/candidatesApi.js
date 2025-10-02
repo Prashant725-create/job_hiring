@@ -1,17 +1,26 @@
 // src/api/candidatesApi.js
-async function request(url, init) {
-  const res = await fetch(url, init);
-  const text = await res.text();
-  let body = null;
-  try { body = text ? JSON.parse(text) : null; } catch (e) { /* ignore json parse error */ }
+// Candidates API wrapper using fetchWithAuth
 
-  if (!res.ok) {
-    const err = new Error(body?.message || res.statusText || "Request failed");
-    err.status = res.status;
-    err.body = body;
-    throw err;
+import fetchWithAuth from "./fetchWithAuth";
+
+/**
+ * requestWithAuth - wrapper around fetchWithAuth that preserves the
+ * old error shape (err.status, err.body) your app expects.
+ */
+async function requestWithAuth(url, init = {}) {
+  try {
+    // fetchWithAuth returns parsed JSON body (or throws an Error with .status/.body)
+    const body = await fetchWithAuth(url, init);
+    return body;
+  } catch (err) {
+    // Normalize thrown error so callers can inspect .status and .body like before
+    if (err && (err.status || err.body || err.message)) {
+      // already structured by fetchWithAuth — rethrow
+      throw err;
+    }
+    const e = new Error(err?.message || "Network error");
+    throw e;
   }
-  return body;
 }
 
 /**
@@ -24,33 +33,72 @@ export async function fetchCandidates({ search = "", stage = "", page = 1, pageS
   if (stage) u.searchParams.set("stage", stage);
   u.searchParams.set("page", String(page));
   u.searchParams.set("pageSize", String(pageSize));
-  return request(u.toString());
+
+  try {
+    const data = await requestWithAuth(u.toString(), {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+
+    // keep same normalization behavior as before
+    return data;
+  } catch (err) {
+    // if fetchWithAuth provided structured error, rethrow as-is
+    if (err.status || err.body) throw err;
+    throw new Error(err?.message || "Request failed");
+  }
 }
 
 /** POST /api/candidates -> create new candidate */
 export async function createCandidate(payload) {
-  return request("/api/candidates", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  try {
+    return await requestWithAuth("/api/candidates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    if (err.status || err.body) throw err;
+    throw new Error(err?.message || "Request failed");
+  }
 }
 
 /** PATCH /api/candidates/:id -> update candidate (e.g., stage transitions) */
 export async function patchCandidate(id, payload) {
-  return request(`/api/candidates/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  try {
+    return await requestWithAuth(`/api/candidates/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    if (err.status || err.body) throw err;
+    throw new Error(err?.message || "Request failed");
+  }
 }
 
 /** GET /api/candidates/:id */
 export async function fetchCandidate(id) {
-  return request(`/api/candidates/${id}`);
+  try {
+    return await requestWithAuth(`/api/candidates/${id}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+  } catch (err) {
+    if (err.status || err.body) throw err;
+    throw new Error(err?.message || "Request failed");
+  }
 }
 
 /** GET /api/candidates/:id/timeline */
 export async function fetchCandidateTimeline(id) {
-  return request(`/api/candidates/${id}/timeline`);
+  try {
+    return await requestWithAuth(`/api/candidates/${id}/timeline`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+  } catch (err) {
+    if (err.status || err.body) throw err;
+    throw new Error(err?.message || "Request failed");
+  }
 }

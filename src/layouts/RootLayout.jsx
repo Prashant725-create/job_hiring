@@ -1,5 +1,6 @@
 import React from "react";
 import { Outlet, Link } from "react-router-dom";
+import { useAuth } from '../contexts/AuthContext';
 
 export default function RootLayout() {
   return (
@@ -17,5 +18,21 @@ export default function RootLayout() {
         <Outlet />
       </main>
     </div>
+  );
+}
+
+function Header() {
+  const { user, logout } = useAuth();
+  return (
+    <header>
+      {user ? (
+        <div>
+          <span>{user.name}</span>
+          <button onClick={() => void logout()}>Logout</button>
+        </div>
+      ) : (
+        <a href="/login">Login</a>
+      )}
+    </header>
   );
 }

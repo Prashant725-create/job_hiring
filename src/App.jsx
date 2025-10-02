@@ -8,6 +8,7 @@ import JobDetail from "./routes/JobDetail";
 import Candidates from "./routes/candidates";
 import CandidateDetail from "./routes/candidateDetail";
 import Assessments from "./routes/Assessments";
+import RequireAuth from './components/RequireAuth';
 import Login from "./routes/Login";
 
 /**
@@ -23,10 +24,10 @@ export default function App() {
         <Route path="/" element={<RootLayout />}>
           <Route index element={<Home />} />
 
-          <Route path="jobs" element={<Jobs />} />
+          <Route path="jobs/*" element={<Jobs />} />
           <Route path="jobs/:jobId" element={<JobDetail />} />
 
-          <Route path="candidates" element={<Candidates />} />
+          <Route path="candidates/*" element={<Candidates />} />
           <Route path="candidates/:id" element={<CandidateDetail />} />
 
           <Route path="assessments" element={<Assessments />} />
@@ -34,6 +35,7 @@ export default function App() {
 
           {/* catch-all: redirect to home or show 404 component */}
           <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="jobs" element={<RequireAuth role="hr"><Jobs /></RequireAuth>} />
         </Route>
       </Routes>
     </BrowserRouter>

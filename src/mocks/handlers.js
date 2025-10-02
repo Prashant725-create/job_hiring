@@ -1,5 +1,5 @@
 // src/mocks/handlers.js
-import { rest } from "msw";
+import { http, HttpResponse, delay } from "msw";
 import { nanoid } from "nanoid";
 import { faker } from "@faker-js/faker";
 
@@ -45,8 +45,8 @@ let candidates = [];
 let candidateTimeline = [];
 
 if (candidates.length === 0) {
-  const CANDIDATE_COUNT = 1000;
-  for (let i = 0; i < CANDIDATE_COUNT; i++) {
+  const CANDIDATE_count = 1000;
+  for (let i = 0; i < CANDIDATE_count; i++) {
     const first = faker.person.firstName();
     const last = faker.person.lastName();
     const name = `${first} ${last}`;
@@ -72,24 +72,63 @@ if (candidates.length === 0) {
   }
 }
 
-/* -------------------- Handlers -------------------- */
+/* ---------------- In-memory stores for Assessments (MSW) ---------------- */
+let assessmentsStore = {}; // map jobId -> assessment object
+let assessmentResponsesStore = {}; // map jobId -> array of responses
+
+// seed a demo assessment so GET /assessments/demo-job returns an object (no 404)
+assessmentsStore["demo-job"] = {
+  jobId: "demo-job",
+  title: "Demo Assessment (seeded)",
+  sections: [
+    {
+      id: nanoid(),
+      title: "General",
+      questions: [
+        {
+          id: nanoid(),
+          label: "Full name",
+          type: "short",
+          required: true,
+        },
+        {
+          id: nanoid(),
+          label: "Do you have prior experience?",
+          type: "single",
+          required: true,
+          options: ["Yes", "No"],
+        },
+        {
+          id: nanoid(),
+          label: "Years of experience",
+          type: "number",
+          min: 0,
+          max: 50,
+          condition: null, // you can add a condition referencing the above question id if needed
+        },
+      ],
+    },
+  ],
+};
+
+/* -------------------- Handlers (MSW v2) -------------------- */
+
 export const handlers = [
   // ---- JOBS ----
   // GET /api/jobs?search=&status=&page=&pageSize=&sort=
-  rest.get("/api/jobs", (req, res, ctx) => {
-    const search = (req.url.searchParams.get("search") || "").trim().toLowerCase();
-    const status = req.url.searchParams.get("status") || "";
-    const page = Number(req.url.searchParams.get("page") || "1");
-    const pageSize = Number(req.url.searchParams.get("pageSize") || "10");
-    const sort = req.url.searchParams.get("sort") || "order";
+  http.get("/api/jobs", async ({ request }) => {
+    const url = new URL(request.url);
+    const search = (url.searchParams.get("search") || "").trim().toLowerCase();
+    const status = url.searchParams.get("status") || "";
+    const page = Number(url.searchParams.get("page") || "1");
+    const pageSize = Number(url.searchParams.get("pageSize") || "10");
+    const sort = url.searchParams.get("sort") || "order";
 
     let filtered = jobs.slice();
 
     if (search) {
       filtered = filtered.filter(
-        (j) =>
-          j.title.toLowerCase().includes(search) ||
-          j.slug.includes(search)
+        (j) => j.title.toLowerCase().includes(search) || j.slug.includes(search)
       );
     }
     if (status) {
@@ -98,19 +137,22 @@ export const handlers = [
 
     if (sort === "order") filtered.sort((a, b) => a.order - b.order);
 
-    return res(ctx.delay(200 + Math.random() * 200), ctx.status(200), ctx.json(paginate(filtered, page, pageSize)));
+    // simulate network latency
+    await delay(200 + Math.random() * 200);
+
+    return HttpResponse.json(paginate(filtered, page, pageSize), { status: 200 });
   }),
 
   // POST /api/jobs -> create job (title required, slug unique)
-  rest.post("/api/jobs", async (req, res, ctx) => {
-    const body = await req.json();
+  http.post("/api/jobs", async ({ request }) => {
+    const body = await request.json();
     const title = (body.title || "").trim();
     if (!title) {
-      return res(ctx.status(400), ctx.json({ message: "Title required" }));
+      return HttpResponse.json({ message: "Title required" }, { status: 400 });
     }
     const slug = makeSlug(title);
     if (jobs.some((j) => j.slug === slug)) {
-      return res(ctx.status(409), ctx.json({ message: "Slug already exists" }));
+      return HttpResponse.json({ message: "Slug already exists" }, { status: 409 });
     }
     const newJob = {
       id: nanoid(),
@@ -121,18 +163,18 @@ export const handlers = [
       order: jobs.length ? Math.max(...jobs.map((j) => j.order)) + 1 : 1,
     };
     jobs.push(newJob);
-    return res(ctx.delay(150), ctx.status(201), ctx.json(newJob));
+
+    await delay(150);
+    return HttpResponse.json(newJob, { status: 201 });
   }),
 
   // PATCH /api/jobs/:id
-  rest.patch("/api/jobs/:id", async (req, res, ctx) => {
-    const id = req.params.id;
-    const body = await req.json();
+  http.patch("/api/jobs/:id", async ({ request, params }) => {
+    const id = params.id;
+    const body = await request.json();
     const job = jobs.find((j) => j.id === id);
-    if (!job) return res(ctx.status(404), ctx.json({ message: "Job not found" }));
+    if (!job) return HttpResponse.json({ message: "Job not found" }, { status: 404 });
 
-    // If title changed, update slug (optional) — we won't enforce slug uniqueness on patch here,
-    // because the client also checks; you can add enforcement if you want.
     if (body.title) {
       job.title = body.title;
       job.slug = makeSlug(body.title);
@@ -141,23 +183,25 @@ export const handlers = [
     if (body.status) job.status = body.status;
     if (typeof body.order !== "undefined") job.order = body.order;
 
-    return res(ctx.delay(200), ctx.status(200), ctx.json(job));
+    await delay(200);
+    return HttpResponse.json(job, { status: 200 });
   }),
 
   // PATCH /api/jobs/:id/reorder -> { toOrder }  (occasionally return 500 to test rollback)
-  rest.patch("/api/jobs/:id/reorder", async (req, res, ctx) => {
-    const id = req.params.id;
-    const { toOrder } = await req.json();
+  http.patch("/api/jobs/:id/reorder", async ({ request, params }) => {
+    const id = params.id;
+    const body = await request.json();
+    const toOrder = body?.toOrder;
 
     const idx = jobs.findIndex((j) => j.id === id);
-    if (idx === -1) return res(ctx.status(404), ctx.json({ message: "Job not found" }));
+    if (idx === -1) return HttpResponse.json({ message: "Job not found" }, { status: 404 });
 
     // simulate occasional server failure (10% chance)
     if (Math.random() < 0.1) {
-      return res(ctx.delay(250), ctx.status(500), ctx.json({ message: "Simulated server error (reorder)" }));
+      await delay(250);
+      return HttpResponse.json({ message: "Simulated server error (reorder)" }, { status: 500 });
     }
 
-    // move item: remove and insert at toOrder - 1 (1-based toOrder)
     const [moving] = jobs.splice(idx, 1);
     const insertIndex = Math.max(0, Math.min(jobs.length, (toOrder || 1) - 1));
     jobs.splice(insertIndex, 0, moving);
@@ -165,25 +209,28 @@ export const handlers = [
     // reassign order numbers
     jobs = jobs.map((j, i) => ({ ...j, order: i + 1 }));
 
-    return res(ctx.delay(200), ctx.status(200), ctx.json({ success: true, jobs }));
+    await delay(200);
+    return HttpResponse.json({ success: true, jobs }, { status: 200 });
   }),
 
   // GET /api/jobs/:id
-  rest.get("/api/jobs/:id", (req, res, ctx) => {
-    const id = req.params.id;
+  http.get("/api/jobs/:id", async ({ params }) => {
+    const id = params.id;
     const job = jobs.find((j) => j.id === id);
-    if (!job) return res(ctx.status(404), ctx.json({ message: "Job not found" }));
-    return res(ctx.delay(150), ctx.status(200), ctx.json(job));
+    if (!job) return HttpResponse.json({ message: "Job not found" }, { status: 404 });
+    await delay(150);
+    return HttpResponse.json(job, { status: 200 });
   }),
 
   /* ---------------- CANDIDATES ---------------- */
 
   // GET /api/candidates?search=&stage=&page=&pageSize=
-  rest.get("/api/candidates", (req, res, ctx) => {
-    const search = (req.url.searchParams.get("search") || "").trim().toLowerCase();
-    const stage = req.url.searchParams.get("stage") || "";
-    const page = Number(req.url.searchParams.get("page") || "1");
-    const pageSize = Number(req.url.searchParams.get("pageSize") || "50");
+  http.get("/api/candidates", async ({ request }) => {
+    const url = new URL(request.url);
+    const search = (url.searchParams.get("search") || "").trim().toLowerCase();
+    const stage = url.searchParams.get("stage") || "";
+    const page = Number(url.searchParams.get("page") || "1");
+    const pageSize = Number(url.searchParams.get("pageSize") || "50");
 
     let filtered = candidates.slice();
 
@@ -197,16 +244,17 @@ export const handlers = [
     // sort by appliedAt desc
     filtered.sort((a, b) => b.appliedAt.localeCompare(a.appliedAt));
 
-    return res(ctx.delay(200 + Math.random() * 200), ctx.status(200), ctx.json(paginate(filtered, page, pageSize)));
+    await delay(200 + Math.random() * 200);
+    return HttpResponse.json(paginate(filtered, page, pageSize), { status: 200 });
   }),
 
   // POST /api/candidates
-  rest.post("/api/candidates", async (req, res, ctx) => {
-    const body = await req.json();
+  http.post("/api/candidates", async ({ request }) => {
+    const body = await request.json();
     const name = (body.name || "").trim();
     const email = (body.email || "").trim();
     if (!name || !email) {
-      return res(ctx.status(400), ctx.json({ message: "name and email required" }));
+      return HttpResponse.json({ message: "name and email required" }, { status: 400 });
     }
     const id = nanoid();
     const appliedAt = new Date().toISOString();
@@ -219,15 +267,16 @@ export const handlers = [
       type: "status_change",
       payload: { from: null, to: "applied" },
     });
-    return res(ctx.delay(150), ctx.status(201), ctx.json(newC));
+    await delay(150);
+    return HttpResponse.json(newC, { status: 201 });
   }),
 
   // PATCH /api/candidates/:id
-  rest.patch("/api/candidates/:id", async (req, res, ctx) => {
-    const id = req.params.id;
-    const body = await req.json();
+  http.patch("/api/candidates/:id", async ({ request, params }) => {
+    const id = params.id;
+    const body = await request.json();
     const ci = candidates.findIndex((c) => c.id === id);
-    if (ci === -1) return res(ctx.status(404), ctx.json({ message: "candidate not found" }));
+    if (ci === -1) return HttpResponse.json({ message: "candidate not found" }, { status: 404 });
 
     const cand = candidates[ci];
     if (body.stage && body.stage !== cand.stage) {
@@ -246,21 +295,79 @@ export const handlers = [
     if (body.email) cand.email = body.email;
 
     candidates[ci] = cand;
-    return res(ctx.delay(120 + Math.random() * 200), ctx.status(200), ctx.json(cand));
+    await delay(120 + Math.random() * 200);
+    return HttpResponse.json(cand, { status: 200 });
   }),
 
   // GET /api/candidates/:id/timeline
-  rest.get("/api/candidates/:id/timeline", (req, res, ctx) => {
-    const id = req.params.id;
-    const events = candidateTimeline.filter((ev) => ev.candidateId === id).sort((a, b) => a.at.localeCompare(b.at));
-    return res(ctx.delay(120), ctx.status(200), ctx.json(events));
+  http.get("/api/candidates/:id/timeline", async ({ params }) => {
+    const id = params.id;
+    const events = candidateTimeline
+      .filter((ev) => ev.candidateId === id)
+      .sort((a, b) => a.at.localeCompare(b.at));
+    await delay(120);
+    return HttpResponse.json(events, { status: 200 });
   }),
 
   // GET /api/candidates/:id
-  rest.get("/api/candidates/:id", (req, res, ctx) => {
-    const id = req.params.id;
+  http.get("/api/candidates/:id", async ({ params }) => {
+    const id = params.id;
     const c = candidates.find((x) => x.id === id);
-    if (!c) return res(ctx.status(404), ctx.json({ message: "not found" }));
-    return res(ctx.delay(100), ctx.status(200), ctx.json(c));
+    if (!c) return HttpResponse.json({ message: "not found" }, { status: 404 });
+    await delay(100);
+    return HttpResponse.json(c, { status: 200 });
   }),
+
+  /* ---------------- ASSESSMENTS ---------------- */
+
+  // GET /assessments/:jobId
+  http.get("/assessments/:jobId", async ({ params }) => {
+    const jobId = params.jobId;
+    const a = assessmentsStore[jobId] || null;
+    if (!a) return HttpResponse.json(null, { status: 404 });
+    await delay(80);
+    return HttpResponse.json(a, { status: 200 });
+  }),
+
+  // PUT /assessments/:jobId  (save/update assessment)
+  http.put("/assessments/:jobId", async ({ request, params }) => {
+    const jobId = params.jobId;
+    const body = await request.json();
+    // basic server-side validation: ensure structure and attach jobId
+    body.jobId = jobId;
+    assessmentsStore[jobId] = body;
+    await delay(80);
+    return HttpResponse.json(body, { status: 200 });
+  }),
+
+  // POST /assessments/:jobId/submit  (store candidate response)
+  http.post("/assessments/:jobId/submit", async ({ request, params }) => {
+    const jobId = params.jobId;
+    const payload = await request.json();
+    if (!assessmentResponsesStore[jobId]) assessmentResponsesStore[jobId] = [];
+    // stamp with server time
+    const resp = { ...payload, storedAt: new Date().toISOString() };
+    assessmentResponsesStore[jobId].unshift(resp);
+    await delay(60);
+    return HttpResponse.json(resp, { status: 201 });
+  }),
+
+
+  http.post('/auth/login', async ({ request }) => {
+    const { email, password } = await request.json();
+    // simple dev credentials
+    if (email === 'hr@example.com' && password === 'password123') {
+      const accessToken = 'MOCK_ACCESS_TOKEN_' + Date.now();
+      return HttpResponse.json({
+        accessToken,
+        user: { id: 'u_hr_1', email: 'hr@example.com', name: 'HR Admin', role: 'hr' }
+      }, { status: 200 });
+    }
+    return HttpResponse.json({ message: 'Invalid credentials' }, { status: 401 });
+  }),
+
+  http.post('/auth/logout', async () => {
+    return HttpResponse.json({ ok: true }, { status: 200 });
+  }),
+
 ];
