@@ -23,7 +23,19 @@ export default function RootLayout() {
         </div>
       </header>
 
+      
+
       <main style={{ padding: 20 }}>
+        <div className="p-6 bg-teal-500 text-white">
+          Tailwind works ✅
+        </div>
+
+        {/*
+          // Optional: show only in development
+          {import.meta.env.DEV && (
+            <div className="p-6 bg-teal-500 text-white">Tailwind works ✅</div>
+          )}
+        */}
         <Outlet />
       </main>
     </div>

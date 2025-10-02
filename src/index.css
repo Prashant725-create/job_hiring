@@ -1,7 +1,9 @@
-/* src/index.css
-   Theme variables + existing global styles merged.
-   Theme is controlled by `html.dark` class (added/removed by ThemeContext).
-*/
+/* src/index.css */
+
+/* Tailwind entrypoints — MUST be the first lines for Tailwind to process */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* ---------------- Theme variables (light = default) ---------------- */
 :root {
@@ -15,32 +17,68 @@
   /* === Theme variables (light default) === */
   --bg: #ffffff;
   --surface: #f8fafc;
-  --text: #213547;      /* mapped from previous light color */
+  --text: #213547;      /* readable dark-on-light */
   --muted: #6b7280;
   --border: #e6e6e6;
-  --accent: #646cff;    /* used to match your previous link color */
-  --accent-hover: #535bf2;
-  --shadow: rgba(2,6,23,0.06);
+  --accent: #00b3a6;    /* teal primary (brand) */
+  --accent-2: #40cfc0;  /* lighter teal */
+  --accent-hover: #008f86;
+  --shadow: 0 6px 16px rgba(2,6,23,0.06);
 
-  /* fallback values used by some rules below */
+  /* UI fallbacks used by some rules below */
   --button-bg: #f9f9f9;
   --button-border: var(--border);
+
+  /* gradient */
+  --teal-gradient: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 50%, #86e3d5 100%);
 }
 
 /* ---------------- Dark theme overrides ---------------- */
 html.dark {
-  --bg: #242424;        /* keep the dark background you used previously */
+  --bg: #242424;        /* darker background (kept from your previous dark) */
   --surface: #1a1a1a;
-  --text: rgba(255, 255, 255, 0.87); /* similar to your original dark text */
+  --text: rgba(255, 255, 255, 0.87);
   --muted: #9aa7b8;
   --border: #333333;
-  --accent: #60a5fa;
-  --accent-hover: #7fc0ff;
-  --shadow: rgba(2,6,23,0.6);
+  --accent: #60d1c2;    /* slightly lighter teal in dark */
+  --accent-2: #2fbba8;
+  --accent-hover: #2fbba8;
+  --shadow: 0 8px 22px rgba(2,6,23,0.6);
 
   --button-bg: #1a1a1a;
   --button-border: #2b2b2b;
 }
+
+/* ---------------- Smooth color transitions & reduced motion ---------------- */
+html,
+body,
+.app-surface,
+.card,
+button {
+  transition: background-color 180ms ease,
+              color 180ms ease,
+              border-color 180ms ease,
+              box-shadow 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html, body, .app-surface, .card, button {
+    transition: none !important;
+  }
+}
+
+.header-gradient {
+  background-image: linear-gradient(135deg, #00b3a6 0%, #40cfc0 50%, #86e3d5 100%);
+  color: white;
+}
+.header-gradient a { color: rgba(255,255,255,0.95); }
+.card-teal {
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+  padding: 12px;
+  box-shadow: 0 8px 22px rgba(0,179,166,0.08);
+}
+
 
 /* ---------------- Basic page styling using variables ---------------- */
 body {
@@ -54,7 +92,7 @@ body {
   background-color: var(--bg);
   color: var(--text);
 
-  /* keep font rendering optimizations from your original */
+  /* font rendering optimizations */
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -98,51 +136,53 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-/* utility classes using variables */
-.app-surface {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  box-shadow: 0 6px 16px var(--shadow);
-}
-
-/* Primary buttons (optionally used across app) */
+/* Primary button helper */
 button.primary {
   background: var(--accent);
   color: white;
   border: none;
 }
 
-/* small helpers */
+/* Simple surface/card helper */
+.app-surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+  border-radius: 12px;
+}
+
+/* Card class example (use for content cards) */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+
+/* Small muted helper */
 .small-muted {
   color: var(--muted);
   font-size: 0.9em;
 }
 
-/* smooth theme color transitions (place this in src/index.css, near your body/theme rules) */
-html,
-body,
-.app-surface,
-button {
-  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+/* Teal gradient helper */
+.bg-teal-gradient {
+  background-image: var(--teal-gradient);
+  color: white;
 }
 
-/* Respect users who prefer reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  html,
-  body,
-  .app-surface,
-  button {
-    transition: none !important;
-  }
-}
+/* Common spacing helpers (small convenience) */
+.p-6 { padding: 1.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mt-6 { margin-top: 1.5rem; }
 
-
-/* ---------------- Optional: media fallback for systems that prefer dark */
+/* ---------------- Optional: preference fallback (no-op area) ---------------- */
 @media (prefers-color-scheme: dark) {
- 
-  :root:not(.user-has-set-theme) {
-   
-  }
+  /* If you want auto dark-by-system *unless* user toggled, use
+     logic in JS to add/remove .user-has-set-theme on <html>.
+     This block left intentionally empty as a placeholder. */
+  :root:not(.user-has-set-theme) { }
 }
-
