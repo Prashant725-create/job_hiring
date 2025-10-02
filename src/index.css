@@ -1,68 +1,148 @@
+/* src/index.css
+   Theme variables + existing global styles merged.
+   Theme is controlled by `html.dark` class (added/removed by ThemeContext).
+*/
+
+/* ---------------- Theme variables (light = default) ---------------- */
 :root {
+  /* base text + font config (kept from your original file) */
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* === Theme variables (light default) === */
+  --bg: #ffffff;
+  --surface: #f8fafc;
+  --text: #213547;      /* mapped from previous light color */
+  --muted: #6b7280;
+  --border: #e6e6e6;
+  --accent: #646cff;    /* used to match your previous link color */
+  --accent-hover: #535bf2;
+  --shadow: rgba(2,6,23,0.06);
+
+  /* fallback values used by some rules below */
+  --button-bg: #f9f9f9;
+  --button-border: var(--border);
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* ---------------- Dark theme overrides ---------------- */
+html.dark {
+  --bg: #242424;        /* keep the dark background you used previously */
+  --surface: #1a1a1a;
+  --text: rgba(255, 255, 255, 0.87); /* similar to your original dark text */
+  --muted: #9aa7b8;
+  --border: #333333;
+  --accent: #60a5fa;
+  --accent-hover: #7fc0ff;
+  --shadow: rgba(2,6,23,0.6);
+
+  --button-bg: #1a1a1a;
+  --button-border: #2b2b2b;
 }
 
+/* ---------------- Basic page styling using variables ---------------- */
 body {
   margin: 0;
   display: flex;
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+
+  /* Use theme variables */
+  background-color: var(--bg);
+  color: var(--text);
+
+  /* keep font rendering optimizations from your original */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Headings */
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
 }
 
+/* Links -- use accent color */
+a {
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: inherit;
+}
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* Buttons -- use variables */
 button {
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--button-border);
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--button-bg);
+  color: var(--text);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: border-color 0.25s, background-color 0.18s, color 0.18s;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: var(--accent);
 }
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
+/* utility classes using variables */
+.app-surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 6px 16px var(--shadow);
+}
+
+/* Primary buttons (optionally used across app) */
+button.primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+}
+
+/* small helpers */
+.small-muted {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+/* smooth theme color transitions (place this in src/index.css, near your body/theme rules) */
+html,
+body,
+.app-surface,
+button {
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  .app-surface,
   button {
-    background-color: #f9f9f9;
+    transition: none !important;
   }
 }
+
+
+/* ---------------- Optional: media fallback for systems that prefer dark */
+@media (prefers-color-scheme: dark) {
+ 
+  :root:not(.user-has-set-theme) {
+   
+  }
+}
+
