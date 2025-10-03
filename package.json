@@ -17,6 +17,7 @@
     "@shadcn/ui": "^0.0.4",
     "axios": "^1.12.2",
     "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "lucide-react": "^0.544.0",
     "msw": "^2.11.3",
     "nanoid": "^5.1.6",
@@ -25,6 +26,8 @@
     "react-hook-form": "^7.63.0",
     "react-router-dom": "^7.9.3",
     "react-window": "^2.1.2",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss-animate": "^1.0.7",
     "uuid": "^13.0.0",
     "yup": "^1.7.1"
   },

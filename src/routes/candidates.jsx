@@ -1,6 +1,7 @@
 // src/routes/Candidates.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
+import { Card, CardContent, CardTitle } from "@/components/ui/card"; 
 // tolerant react-window import (put this after React imports)
 import * as RW from "react-window";
 const List = RW.FixedSizeList || (RW.default && RW.default.FixedSizeList) || null;
@@ -157,6 +158,7 @@ function IndexView({
             {/* pagination */}
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 12 }}>
         <button
+          className="pager-button"
           disabled={page <= 1}
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           style={{ padding: "6px 10px", background: "#eee", borderRadius: 6 }}
@@ -165,6 +167,7 @@ function IndexView({
         </button>
         <div>Page {page} of {pages}</div>
         <button
+          className="pager-button"
           disabled={page >= pages}
           onClick={() => setPage((p) => Math.min(pages, p + 1))}
           style={{ padding: "6px 10px", background: "#eee", borderRadius: 6 }}
@@ -175,46 +178,48 @@ function IndexView({
 
       <div style={{ marginTop: 18 }}>
         <h3>Kanban (drag candidate to stage)</h3>
-        <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
-          {STAGES.map((stage) => {
-            const list = filtered.filter((c) => c.stage === stage);
-            return (
-              <div
-                key={stage}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const id = e.dataTransfer.getData("candidateId");
-                  if (id) moveCandidate(id, stage);
-                }}
-                style={{ minWidth: 260, background: "#f7f7f7", padding: 8, borderRadius: 8 }}
-              >
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>{stage} ({list.length})</div>
-                {list.slice(0, 50).map((c) => (
-                  <div
-                    key={c.id}
-                    draggable
-                    onDragStart={(e) => e.dataTransfer.setData("candidateId", c.id)}
-                    style={{ padding: 8, border: "1px solid #eee", borderRadius: 6, marginBottom: 8, background: "#fff", cursor: "grab" }}
-                  >
-                    <div style={{ fontWeight: 600 }}>{c.name}</div>
-                    <div style={{ fontSize: 12, color: "#666" }}>{c.email}</div>
-                    <div style={{ marginTop: 6 }}>
-                      Move:
-                      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                        {STAGES.map((s) =>
-                          s !== c.stage ? <button key={s} onClick={() => moveCandidate(c.id, s)} style={{ fontSize: 12 }}>{s}</button> : null
-                        )}
+
+        {/* height-limited area so you can scroll vertically for the whole board */}
+        <div className="kanban-wrapper">
+          <div className="kanban-grid">
+            {STAGES.map((stage) => {
+              const list = filtered.filter((c) => c.stage === stage);
+              return (
+                <div
+                  key={stage}
+                  className="kanban-column"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const id = e.dataTransfer.getData("candidateId");
+                    if (id) moveCandidate(id, stage);
+                  }}
+                >
+                  <div className="kanban-title">{stage} ({list.length})</div>
+                  <div className="kanban-items">
+                    {list.slice(0, 50).map((c) => (
+                      <div
+                        className="kanban-card"
+                        key={c.id}
+                        draggable
+                        onDragStart={(e) => e.dataTransfer.setData("candidateId", c.id)}
+                      >
+                        <div className="kanban-card-title">{c.name}</div>
+                        <div className="kanban-card-email">{c.email}</div>
+                        <div className="kanban-card-actions">
+                          {STAGES.map((s) => s !== c.stage ? (
+                            <button key={s} onClick={() => moveCandidate(c.id, s)} className="move-btn small">{s}</button>
+                          ) : null)}
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
-
       {/* Create modal */}
       {openCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -381,24 +386,34 @@ export default function Candidates() {
   const Row = ({ index, style }) => {
     const c = filtered[index];
     if (!c) return null;
+
     return (
-      <div style={{ ...style, padding: 8 }}>
-        <div style={{ border: "1px solid #e8e8e8", borderRadius: 8, padding: 12, background: "#fff", display: "flex", justifyContent: "space-between" }}>
-          <div style={{ textAlign: "left" }}>
-            <div style={{ fontWeight: 700 }}>{c.name}</div>
-            <div style={{ fontSize: 13, color: "#666" }}>{c.email}</div>
-            <div style={{ fontSize: 12, color: "#888" }}>Stage: {c.stage}</div>
+      <div style={{ ...style, padding: 8, boxSizing: "border-box", width: "100%" }}>
+        <div className="candidate-row">
+          {/* LEFT: main content - allow shrinking (min-width:0) so it truncates instead of pushing layout */}
+          <div className="candidate-main">
+            <div className="name" title={c.name}>{c.name}</div>
+            <div className="email" title={c.email}>{c.email}</div>
+            <div className="small-muted">Stage: {c.stage}</div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <Link to={`${c.id}`}>Open</Link>
-            <div>
-              Move to:
-              <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                {STAGES.map(s => s !== c.stage ? (
-                  <button key={s} onClick={() => moveCandidate(c.id, s)} style={{ fontSize: 12 }}>{s}</button>
-                ) : null)}
-              </div>
+          {/* RIGHT: actions area (fixed-ish) */}
+          <div className="candidate-actions">
+            <Link to={`${c.id}`} className="candidate-open">Open</Link>
+
+            <div className="move-buttons">
+              {STAGES.map((s) =>
+                s !== c.stage ? (
+                  <button
+                    key={s}
+                    onClick={() => moveCandidate(c.id, s)}
+                    className="move-btn tag-btn"
+                    type="button"
+                  >
+                    {s}
+                  </button>
+                ) : null
+              )}
             </div>
           </div>
         </div>
@@ -406,38 +421,52 @@ export default function Candidates() {
     );
   };
 
+
   /* Kanban column renderer */
-  function KanbanColumns() {
-    return (
-      <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
-        {STAGES.map(stage => {
-          const list = filtered.filter(c => c.stage === stage);
-          return (
-            <div key={stage} onDragOver={onDragOver} onDrop={(e) => onDrop(e, stage)} style={{ minWidth: 260, background: "#f7f7f7", padding: 8, borderRadius: 8 }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>{stage} ({list.length})</div>
-              {list.slice(0, 50).map(c => (
-                <div key={c.id}
-                     draggable
-                     onDragStart={(e) => onDragStart(e, c.id)}
-                     style={{ padding: 8, border: "1px solid #eee", borderRadius: 6, marginBottom: 8, background: "#fff", cursor: "grab" }}>
-                  <div style={{ fontWeight: 600 }}>{c.name}</div>
-                  <div style={{ fontSize: 12, color: "#666" }}>{c.email}</div>
-                  <div style={{ marginTop: 6 }}>
-                    Move:
-                    <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                      {STAGES.map(s => s !== c.stage ? (
-                        <button key={s} onClick={() => moveCandidate(c.id, s)} style={{ fontSize: 12 }}>{s}</button>
-                      ) : null)}
-                    </div>
+  /* inside Candidates.jsx — replace existing KanbanColumns() */
+    function KanbanColumns() {
+      return (
+        <div className="kanban-wrapper">
+          {/* outer control for vertical height so the whole board stays visible on the page */}
+          <div className="kanban-scrollable">
+            {/* kanban-board uses grid-auto-columns so columns compress to fit viewport */}
+            <div className="kanban-board" role="list" aria-label="Kanban columns">
+              {STAGES.map((stage) => {
+                const list = filtered.filter((c) => c.stage === stage);
+                return (
+                  <div key={stage} className="kanban-column" onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+                    e.preventDefault();
+                    const id = e.dataTransfer.getData("candidateId");
+                    if (id) moveCandidate(id, stage);
+                  }}>
+                    <div className="column-title">{stage} ({list.length})</div>
+                    {list.slice(0, 50).map((c) => (
+                      <div
+                        key={c.id}
+                        className="kanban-card"
+                        draggable
+                        onDragStart={(e) => e.dataTransfer.setData("candidateId", c.id)}
+                      >
+                        <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>{c.email}</div>
+                        <div style={{ marginTop: 6 }}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {STAGES.map(s => s !== c.stage ? (
+                              <button key={s} onClick={() => moveCandidate(c.id, s)} style={{ fontSize: 12 }}>{s}</button>
+                            ) : null)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
-    );
-  }
+          </div>
+        </div>
+      );
+    }
+
 
   /* local mention suggestions (client-side) */
   const mentionSuggestions = useMemo(() => {
