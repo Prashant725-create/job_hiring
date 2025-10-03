@@ -1,8 +1,6 @@
 // src/components/ThemeToggle.jsx
 import React from "react";
 import { useTheme } from "../contexts/ThemeContext";
-import SunIcon from "../assets/DarkMode/sun.svg";
-import MoonIcon from "../assets/DarkMode/moon.svg";
 
 export default function ThemeToggle({ className = "" }) {
   const { theme, toggleTheme } = useTheme();
@@ -27,9 +25,9 @@ export default function ThemeToggle({ className = "" }) {
       }}
     >
       {isDark ? (
-        <img src={SunIcon} alt="Light mode" width={18} height={18} />
+        <img src="/sun.svg" alt="Light mode" width={18} height={18} />
       ) : (
-        <img src={MoonIcon} alt="Dark mode" width={18} height={18} />
+        <img src="/moon.svg" alt="Dark mode" width={18} height={18} />
       )}
       <span style={{ fontSize: 13 }}>{isDark ? "Light" : "Dark"}</span>
     </button>
