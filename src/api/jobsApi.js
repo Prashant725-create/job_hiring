@@ -1,6 +1,7 @@
 // src/api/jobsApi.js
 // Defensive fetch-based API wrapper expected by Jobs.jsx
-import fetchWithAuth from './fetchWithAuth'; // <- use the single fetchWithAuth file
+import fetchWithAuth from "./fetchWithAuth"; // <- use the single fetchWithAuth file
+import { saveJob, bulkSaveJobs } from "../db";
 
 function handleResponseError(respUrl, status, statusText, bodyText) {
   const msg = `Request failed: ${status} ${statusText} (${respUrl}) - body: ${bodyText}`;
@@ -13,9 +14,6 @@ function handleResponseError(respUrl, status, statusText, bodyText) {
 /**
  * requestWithAuth - small wrapper around fetchWithAuth that preserves
  * easy-to-debug error messages for your existing UI.
- *
- * fetchWithAuth already throws a helpful Error; but to keep the exact error
- * shape you had earlier we re-wrap thrown errors when possible.
  */
 async function requestWithAuth(url, init = {}) {
   try {
@@ -23,11 +21,9 @@ async function requestWithAuth(url, init = {}) {
     const body = await fetchWithAuth(url, init);
     return body;
   } catch (err) {
-    // err could be an Error produced by fetchWithAuth with .status and .body,
-    // or a lower-level network error. Re-throw with similar shape to existing code.
-    // If it's already structured, just rethrow.
+    // if it's already structured, rethrow
     if (err && (err.status || err.body || err.message)) throw err;
-    throw new Error(err?.message || 'Network error');
+    throw new Error(err?.message || "Network error");
   }
 }
 
@@ -46,10 +42,22 @@ export async function fetchJobs({
   u.searchParams.set("sort", sort);
 
   try {
-    const data = await requestWithAuth(u.toString(), {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    });
+    const data = await requestWithAuth(u.toString(), { method: 'GET', headers: { Accept: 'application/json' } });
+
+    // persist jobs locally if present (non-blocking)
+    try {
+      // handle both shapes: array or { results: [] }
+      const arr = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      if (arr.length) {
+          try { await bulkSaveJobs(arr); } catch (err) { console.warn("bulkSaveJobs failed", err); }
+      }
+      return data;
+    } 
+    catch (persistErr) {
+      // Non-fatal: log warning and proceed
+      // eslint-disable-next-line no-console
+      console.warn("jobsApi: failed to persist jobs locally", persistErr);
+    }
 
     // Normalize to { results, total, page, pages, pageSize }
     if (Array.isArray(data)) {
@@ -63,7 +71,6 @@ export async function fetchJobs({
     }
     return data;
   } catch (err) {
-    // If fetchWithAuth provided body/status, surface them in a similar message
     if (err.status || err.body) {
       const b = typeof err.body === "string" ? err.body : JSON.stringify(err.body || "");
       throw handleResponseError("/api/jobs", err.status || 0, err.message || "", b || "<empty>");
@@ -79,6 +86,12 @@ export async function createJob(body) {
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(body),
     });
+
+    // persist created job (non-blocking)
+    if (data && data.id) {
+      try { await saveJob(data); } catch (e) { console.warn("saveJob failed", e); }
+    }
+
     return data;
   } catch (err) {
     const b = err.body ? (typeof err.body === "string" ? err.body : JSON.stringify(err.body)) : "<empty>";
@@ -93,6 +106,12 @@ export async function patchJob(id, body) {
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(body),
     });
+
+    // persist updated job (non-blocking)
+    if (data && data.id) {
+      try { await saveJob(data); } catch (e) { console.warn("saveJob failed", e); }
+    }
+
     return data;
   } catch (err) {
     const b = err.body ? (typeof err.body === "string" ? err.body : JSON.stringify(err.body)) : "<empty>";
@@ -107,6 +126,17 @@ export async function reorderJob(id, toOrder) {
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ toOrder }),
     });
+
+    // If server returns updated full jobs list, persist it (non-blocking)
+    try {
+      if (data && Array.isArray(data.jobs) && data.jobs.length) {
+        await bulkSaveJobs(data.jobs);
+      }
+    } catch (persistErr) {
+      // eslint-disable-next-line no-console
+      console.warn("jobsApi: failed to persist reordered jobs locally", persistErr);
+    }
+
     return data;
   } catch (err) {
     const b = err.body ? (typeof err.body === "string" ? err.body : JSON.stringify(err.body)) : "<empty>";
@@ -120,6 +150,15 @@ export async function getJob(id) {
       method: "GET",
       headers: { Accept: "application/json" },
     });
+
+    // persist fetched job (non-blocking)
+    try {
+      if (data && data.id) await saveJob(data);
+    } catch (persistErr) {
+      // eslint-disable-next-line no-console
+      console.warn("jobsApi: failed to persist fetched job locally", persistErr);
+    }
+
     return data;
   } catch (err) {
     const b = err.body ? (typeof err.body === "string" ? err.body : JSON.stringify(err.body)) : "<empty>";

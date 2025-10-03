@@ -2,6 +2,7 @@
 // Candidates API wrapper using fetchWithAuth
 
 import fetchWithAuth from "./fetchWithAuth";
+import { saveCandidate, bulkSaveCandidates } from "../db";
 
 /**
  * requestWithAuth - wrapper around fetchWithAuth that preserves the
@@ -27,6 +28,7 @@ async function requestWithAuth(url, init = {}) {
  * GET /api/candidates?search=&stage=&page=&pageSize=
  * Returns paginated shape: { total, page, pageSize, pages, results: [] }
  */
+// --- fetchCandidates (replace existing) ---
 export async function fetchCandidates({ search = "", stage = "", page = 1, pageSize = 50 } = {}) {
   const u = new URL("/api/candidates", location.origin);
   if (search) u.searchParams.set("search", search);
@@ -40,42 +42,62 @@ export async function fetchCandidates({ search = "", stage = "", page = 1, pageS
       headers: { Accept: "application/json" },
     });
 
-    // keep same normalization behavior as before
+    // If server returned a paginated object with results, persist them locally
+    const arr = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+    if (arr.length) {
+      try { await bulkSaveCandidates(arr); } catch (err) { console.warn("bulkSaveCandidates failed", err); }
+    }
+
     return data;
   } catch (err) {
-    // if fetchWithAuth provided structured error, rethrow as-is
     if (err.status || err.body) throw err;
     throw new Error(err?.message || "Request failed");
   }
 }
+
+
 
 /** POST /api/candidates -> create new candidate */
 export async function createCandidate(payload) {
   try {
-    return await requestWithAuth("/api/candidates", {
+    const data = await requestWithAuth("/api/candidates", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(payload),
     });
+
+    // persist
+    if (data && data.id) {
+      try { await saveCandidate(data); } catch (e) { console.warn("saveCandidate failed", e); }
+    }
+
+    return data;
   } catch (err) {
     if (err.status || err.body) throw err;
     throw new Error(err?.message || "Request failed");
   }
 }
 
-/** PATCH /api/candidates/:id -> update candidate (e.g., stage transitions) */
+
 export async function patchCandidate(id, payload) {
   try {
-    return await requestWithAuth(`/api/candidates/${id}`, {
+    const data = await requestWithAuth(`/api/candidates/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(payload),
     });
+
+    if (data && data.id) {
+      try { await saveCandidate(data); } catch (e) { console.warn("saveCandidate failed", e); }
+    }
+
+    return data;
   } catch (err) {
     if (err.status || err.body) throw err;
     throw new Error(err?.message || "Request failed");
   }
 }
+
 
 /** GET /api/candidates/:id */
 export async function fetchCandidate(id) {

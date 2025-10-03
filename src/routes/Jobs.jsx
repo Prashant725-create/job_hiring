@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
 import { fetchJobs, createJob, patchJob, reorderJob } from "../api/jobsApi";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { getJobs as dbGetJobs } from "../db"; // name conflict, rename e.g. dbGetJobs
 
 /* ---------- helpers ---------- */
 const makeSlug = (s = "") =>
@@ -216,24 +217,29 @@ export default function JobsPage() {
   }, []);
 
   // load from server (uses fetchJobs from your jobsApi.js)
-  async function load() {
-    setLoading(true);
-    try {
-      const res = await fetchJobs({ search: search || "", status: status || "", page, pageSize: PAGE_SIZE, sort: "order" });
+    async function load() {
+      setLoading(true);
+      try {
+        // 1) try IndexedDB first
+        const local = await dbGetJobs({ page, pageSize: PAGE_SIZE, status, search });
+        if (local && Array.isArray(local.results) && local.results.length) {
+          setJobs(local.results);
+          setTotal(local.total);
+        }
 
-      if (!res || typeof res !== "object") throw new Error("Invalid response from server");
-      const results = Array.isArray(res) ? res : res.results;
-      if (!results) throw new Error("Response missing results");
-
-      setJobs(results);
-      setTotal(typeof res.total === "number" ? res.total : results.length);
-    } catch (err) {
-      console.error("load failed", err);
-      alert("Failed to load jobs — check console/network and MSW worker.");
-    } finally {
-      setLoading(false);
+        // 2) fetch network to reconcile (will update DB because api client writes through)
+        const server = await fetchJobs({ search, status, page, pageSize: PAGE_SIZE, sort: "order" });
+        if (server && server.results) {
+          setJobs(server.results);
+          setTotal(server.total ?? server.results.length);
+        }
+      } catch (err) {
+        console.error("load failed", err);
+        alert("Failed to load jobs — check console/network and MSW worker.");
+      } finally {
+        setLoading(false);
+      }
     }
-  }
 
   useEffect(() => {
     void load();

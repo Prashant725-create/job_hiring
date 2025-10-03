@@ -2,6 +2,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardTitle } from "@/components/ui/card"; 
+import { getCandidates as dbGetCandidates, bulkSaveCandidates } from "../db";
+
 // tolerant react-window import (put this after React imports)
 import * as RW from "react-window";
 const List = RW.FixedSizeList || (RW.default && RW.default.FixedSizeList) || null;
@@ -255,7 +257,7 @@ export default function Candidates() {
   const [search, setSearch] = useState(""); // client-side search across loaded data
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [_pageSize] = useState(PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   
 
   // create modal
@@ -276,38 +278,66 @@ export default function Candidates() {
   }, []);
 
   /* loadAll: fetch candidates from server (server-like filtering by stage) */
-    async function loadAll() {
-    setLoading(true);
-    try {
-      // request server with search/stage/page/pageSize
-      const res = await fetchCandidates({
-        search: search || "",
-        stage: stageFilter || "",
-        page,
-        pageSize: PAGE_SIZE,
-      });
+async function loadAll() {
+  setLoading(true);
+  try {
+    // Read local first (fast UI)
+    const local = await dbGetCandidates({
+      page,
+      pageSize,
+      stage: stageFilter,
+      search,
+    });
 
-      // defensive shape check
-      const results = Array.isArray(res) ? res : (res?.results ?? null);
-      if (!results) {
-        console.error("loadAll: unexpected response", res);
+    if (local && Array.isArray(local.results)) {
+      setData(local.results);
+      setTotal(typeof local.total === "number" ? local.total : (local.results.length || 0));
+    }
+
+    // Then fetch fresh data from server (network)
+    const server = await fetchCandidates({
+      page,
+      pageSize,
+      stage: stageFilter,
+      search,
+    });
+
+    // Defensive check: server returns paginated shape { results, total, ... } or an array
+    const serverResults = Array.isArray(server) ? server : server?.results ?? null;
+    if (serverResults) {
+      const tot = typeof server?.total === "number" ? server.total : serverResults.length;
+      setData(serverResults);
+      setTotal(tot);
+
+      // write-through to local DB (so subsequent loads read from local first)
+      // This is optional but recommended for offline/local persistence.
+      try {
+        if (Array.isArray(serverResults) && serverResults.length) {
+          await bulkSaveCandidates(serverResults);
+        }
+      } catch (dbErr) {
+        console.warn("Failed to persist server candidates to local DB:", dbErr);
+      }
+    } else {
+      // If server responded with unexpected shape but we already showed local data, do nothing.
+      if (!local || !Array.isArray(local.results)) {
+        console.error("loadAll: unexpected server response", server);
         throw new Error("Invalid response from /api/candidates");
       }
-
-      // determine total count (server should return `total`)
-      const tot = typeof res?.total === "number" ? res.total : results.length;
-
-      setData(results);
-      setTotal(tot);
-    } catch (err) {
-      console.error("Failed to load candidates", err);
-      alert("Failed to load candidates — check console/network and MSW worker.");
+    }
+  } catch (err) {
+    console.error("Failed to load candidates", err);
+    // preserve any local data if present; otherwise clear UI and show user-friendly message
+    if (!data || data.length === 0) {
       setData([]);
       setTotal(0);
-    } finally {
-      setLoading(false);
     }
+    // optional user-visible alert
+    alert("Failed to load candidates — check console/network and MSW worker.");
+  } finally {
+    setLoading(false);
   }
+}
 
 
   useEffect(() => {
