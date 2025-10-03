@@ -1,148 +1,329 @@
-/* src/index.css
-   Theme variables + existing global styles merged.
-   Theme is controlled by `html.dark` class (added/removed by ThemeContext).
-*/
+
+
+/* Tailwind (keep these at top when using Tailwind) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* ---------------- Theme variables (light = default) ---------------- */
 :root {
-  /* base text + font config (kept from your original file) */
+  
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: light dark;
 
-  /* === Theme variables (light default) === */
+  /* color tokens (light theme) */
   --bg: #ffffff;
   --surface: #f8fafc;
-  --text: #213547;      /* mapped from previous light color */
+  --text: #213547;        /* primary text in light */
   --muted: #6b7280;
   --border: #e6e6e6;
-  --accent: #646cff;    /* used to match your previous link color */
-  --accent-hover: #535bf2;
+  --accent: #00b3a6;      /* teal primary */
+  --accent-2: #40cfc0;
+  --accent-hover: #007f75;
   --shadow: rgba(2,6,23,0.06);
-
-  /* fallback values used by some rules below */
   --button-bg: #f9f9f9;
   --button-border: var(--border);
+
+  /* layout */
+  --container-max-width: 1100px;
 }
 
 /* ---------------- Dark theme overrides ---------------- */
 html.dark {
-  --bg: #242424;        /* keep the dark background you used previously */
+  --bg: #242424;
   --surface: #1a1a1a;
-  --text: rgba(255, 255, 255, 0.87); /* similar to your original dark text */
+  --text: rgba(255, 255, 255, 0.92); /* visible in dark */
   --muted: #9aa7b8;
   --border: #333333;
-  --accent: #60a5fa;
-  --accent-hover: #7fc0ff;
-  --shadow: rgba(2,6,23,0.6);
-
+  --accent: #60d1c2;  /* teal-ish in dark */
+  --accent-2: #2fbba8;
+  --accent-hover: #40cfc0;
+  --shadow: rgba(0,0,0,0.45);
   --button-bg: #1a1a1a;
   --button-border: #2b2b2b;
 }
 
-/* ---------------- Basic page styling using variables ---------------- */
+/* ---------------- Base page & layout ---------------- */
+html, body {
+  height: 100%;
+}
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
-
-  /* Use theme variables */
   background-color: var(--bg);
   color: var(--text);
-
-  /* keep font rendering optimizations from your original */
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
-/* Headings */
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* central app container used by layouts */
+.app-container {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 0 16px;
+  width: 100%;
 }
 
-/* Links -- use accent color */
-a {
-  font-weight: 500;
-  color: var(--accent);
-  text-decoration: inherit;
+/* header gradient and helpers */
+.header-gradient {
+  background-image: linear-gradient(135deg, #00b3a6 0%, #40cfc0 50%, #86e3d5 100%);
+  color: white;
 }
-a:hover {
-  color: var(--accent-hover);
+.header-gradient a,
+.header-gradient .nav-link { color: rgba(255,255,255,0.95); text-decoration: none; }
+
+/* teal card helper */
+.card-teal {
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 8px 22px rgba(0,179,166,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
 }
 
-/* Buttons -- use variables */
+/* header brand / nav styles (small improvements) */
+.site-nav .nav-link {
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.site-nav .nav-link:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+/* ---------------- Inputs / form elements (make readable in dark) ---------------- */
+input, textarea, select {
+  color: var(--text);           /* explicit so typed text is visible */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  font: inherit;
+}
+input::placeholder, textarea::placeholder { color: var(--muted); }
+input, textarea { caret-color: var(--text); } /* caret visible in dark */
+
+/* ensure selects are readable on all platforms */
+select { appearance: none; }
+
+/* buttons across the app */
 button {
   border-radius: 8px;
   border: 1px solid var(--button-border);
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: var(--button-bg);
+  padding: 0.5rem 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: var(--button-bg);
   color: var(--text);
   cursor: pointer;
-  transition: border-color 0.25s, background-color 0.18s, color 0.18s;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
-button:hover {
-  border-color: var(--accent);
+button:hover { border-color: var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+button.primary { background: var(--accent); color: white; border: none; }
+
+/* small helpers */
+.small-muted { color: var(--muted); font-size: 0.9rem; }
+.tag-btn { display: inline-block; padding: 4px 8px; font-size: 12px; border-radius: 6px; background: var(--button-bg); border: 1px solid var(--border); color: var(--text); }
+
+
+
+
+/* keep smooth transitions */
+html, body, .app-surface, .card, button, input, textarea, select {
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+@media (prefers-reduced-motion: reduce) {
+  html, body, .app-surface, .card, button, input, textarea, select { transition: none !important; }
 }
 
-/* utility classes using variables */
-.app-surface {
+/* ---------------- Jobs grid (5 per row) ---------------- */
+.jobs-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+@media (max-width: 1200px) {
+  .jobs-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 700px) {
+  .jobs-grid { grid-template-columns: repeat(1, 1fr); }
+}
+.job-card {
+  padding: 12px;
+  border-radius: 10px;
   background: var(--surface);
   border: 1px solid var(--border);
-  color: var(--text);
+  box-shadow: 0 6px 18px var(--shadow);
+}
+.job-card .title { font-weight: 700; margin-bottom: 6px; }
+.job-card .meta { color: var(--muted); font-size: 0.95rem; }
+
+/* ---------------- Candidates row + virtualization fallback ---------------- */
+/* candidate row layout: keeps content on one horizontal line if there's room */
+.candidate-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* main area should shrink but not overflow */
+.candidate-row .candidate-main {
+  flex: 1 1 auto;
+  min-width: 160px;
+  overflow: hidden;
+}
+
+
+.candidate-row .candidate-main .name,
+.candidate-row .candidate-main .email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+.candidate-row .candidate-actions {
+  flex: 0 0 auto;
+  min-width: 140px;
+  text-align: right;
+}
+
+
+.candidate-list {
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* ---------------- Kanban board styles (fit & responsive) ---------------- */
+.kanban-wrapper {
+  width: 100%;
+  overflow-x: auto;      /* allow horizontal scroll when absolutely needed */
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+/* Use CSS Grid in column-flow mode — columns will try to share the available width.
+   grid-auto-columns controls the min allowed column width and allows them to shrink.
+   Adjust 120px if you'd like smaller/larger minimum column widths. */
+/* Kanban: horizontal scroll layout */
+.kanban-board {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;   /* allow horizontal scroll */
+  padding-bottom: 8px;
+}
+
+.kanban-column {
+  min-width: 260px;   /* each column has a min width */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 8px;
+  border-radius: 8px;
+  flex-shrink: 0;     /* prevent shrinking, keep columns side by side */
+}
+
+
+/* control kanban vertical size so when scrolling the page the board is visible:
+   this keeps the Kanban compact on tall pages; adjust 55vh to taste. */
+.kanban-scrollable {
+  max-height: 55vh;  /* keeps the whole board visible when you scroll the page */
+  overflow-y: auto;
+  padding-right: 6px; /* spare room for scrollbar */
+}
+
+/* Kanban card */
+.kanban-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 8px;
+  border-radius: 8px;
   box-shadow: 0 6px 16px var(--shadow);
 }
 
-/* Primary buttons (optionally used across app) */
-button.primary {
-  background: var(--accent);
+@media (max-width: 720px) {
+  .candidate-row { flex-wrap: wrap; }
+  .candidate-row .candidate-actions { text-align: left; width: 100%; }
+  .kanban-board { grid-auto-columns: minmax(160px, 1fr); } /* slightly larger minimum on small */
+  .kanban-scrollable { max-height: 65vh; }
+}
+
+/* responsive tweaks so the horizontal content fits the screen:
+   - ensure candidate rows don't overflow horizontally
+   - make sure kanban columns wrap into visible rows when scrolling vertically */
+.container-full-width { width: 100%; box-sizing: border-box; overflow-x: hidden; }
+
+/* Keep large buttons & links usable on mobile */
+a, button { -webkit-tap-highlight-color: transparent; }
+
+/* centered title helper */
+.centered-title { text-align: center; margin: 12px 0 24px; font-weight: 700; font-size: 1.4rem; }
+
+/* ---------------- Optional: small utilities for gradient usage ---------------- */
+.header-gradient-small {
+  background-image: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
   color: white;
-  border: none;
+  padding: 6px 8px;
+  border-radius: 8px;
 }
 
-/* small helpers */
-.small-muted {
-  color: var(--muted);
-  font-size: 0.9em;
+.floating-preview {
+  background: var(--button-bg);
+  color: var(--text);
+  border: 1px solid var(--button-border);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
 }
 
-/* smooth theme color transitions (place this in src/index.css, near your body/theme rules) */
-html,
-body,
-.app-surface,
-button {
-  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
-}
-
-/* Respect users who prefer reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  html,
-  body,
-  .app-surface,
-  button {
-    transition: none !important;
+/* on very small screens place the button inline instead of floating */
+@media (max-width: 520px) {
+  .floating-preview {
+    position: static !important;
+    display: inline-block;
+    margin: 8px 0;
   }
 }
 
-
-/* ---------------- Optional: media fallback for systems that prefer dark */
-@media (prefers-color-scheme: dark) {
- 
-  :root:not(.user-has-set-theme) {
-   
-  }
+button.pager-button {
+  color: #000 !important;            /* always black text */
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background-clip: padding-box;      /* avoid border bleed with rounded corners */
 }
 
+/* Disabled state — keep black text but reduce opacity to show disabled */
+button.pager-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Hover: keep black text but highlight background slightly if needed */
+button.pager-button:not(:disabled):hover {
+  color: #000 !important;
+  /* don't override inline background unless you want to:
+     background: var(--accent); */
+}
+
+/* ---------------- Compatibility / fallback notes ---------------- */
+/* If you want input text always black regardless of theme, override:
+   input, textarea, select { color: #000 !important; caret-color: #000 !important; }
+   but recommended to keep color: var(--text) so dark theme uses readable colors.
+*/
+
+/* end of merged CSS */

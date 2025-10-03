@@ -1,6 +1,7 @@
 // src/routes/Assessments.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Card, CardContent, CardTitle } from "@/components/ui/card"; 
 
 // --- utils ---
 const makeId = (prefix = "") => `${prefix}${Math.random().toString(36).slice(2, 9)}`;
@@ -25,6 +26,18 @@ const defaultQuestion = (type = "short") => ({
   maxLength: undefined,
   condition: null,
 });
+
+function FormSection({ title, children }) {
+  return (
+    <Card className="mb-6">
+      <CardContent>
+        <CardTitle>{title}</CardTitle>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
 
 // helper: read file as data URL and return metadata object
 function readFileAsDataUrl(file) {
@@ -239,43 +252,86 @@ export default function Assessments() {
     <div style={{ padding: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
         <h2>{assessment.title}</h2>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 20 }}>
           <Link to="/">← Back</Link>
-          <button onClick={() => setEditMode((m) => !m)}>{editMode ? "Preview/Run" : "Edit"}</button>
         </div>
       </div>
 
+  {/* builder area — floating preview button is positioned relative to this left column */}
       <div style={{ display: "flex", gap: 16 }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          {/* Floating Preview/Run button at the top-right of the builder */}
+          <button
+            type="button"
+            aria-label="Toggle preview"
+            onClick={() => setEditMode((m) => !m)}
+            className="floating-preview"
+            style={{
+              position: "absolute",
+              right: 0,
+              top: 4,
+              zIndex: 10,
+            }}
+          >
+            {editMode ? "Preview / Run" : "Edit"}
+          </button>
+
           {editMode ? (
             <>
               <button onClick={addSection}>+ Add section</button>
               {assessment.sections.map((sec) => (
-                <div key={sec.id} style={{ border: "1px solid #ddd", padding: 8, marginTop: 8 }}>
-                  <input value={sec.title} onChange={(e) => { const next = clone(assessment); next.sections.find(s => s.id === sec.id).title = e.target.value; setAssessment(next); saveAssessment(jid, next); }} style={{ fontWeight: 700 }} />
-                  <button onClick={() => addQuestion(sec.id)}>+ Add Q</button>
+                <FormSection
+                  key={sec.id}
+                  title={
+                    <input
+                      value={sec.title}
+                      onChange={(e) => {
+                        const next = clone(assessment);
+                        next.sections.find((s) => s.id === sec.id).title = e.target.value;
+                        setAssessment(next);
+                        saveAssessment(jid, next);
+                      }}
+                      style={{ fontWeight: 700, width: "100%" }}
+                    />
+                  }
+                >
+                  <button onClick={() => addQuestion(sec.id)}>+ Add Question</button>
                   {sec.questions.map((q) => (
                     <div key={q.id} style={{ marginTop: 4 }}>
-                      <input value={q.label} onChange={(e) => { const next = clone(assessment); next.sections.find(s => s.id === sec.id).questions.find(qq => qq.id === q.id).label = e.target.value; setAssessment(next); saveAssessment(jid, next); }} />
-                      <select value={q.type} 
+                      <input
+                        value={q.label}
+                        onChange={(e) => {
+                          const next = clone(assessment);
+                          next.sections
+                            .find((s) => s.id === sec.id)
+                            .questions.find((qq) => qq.id === q.id).label = e.target.value;
+                          setAssessment(next);
+                          saveAssessment(jid, next);
+                        }}
+                      />
+                      <select
+                        value={q.type}
                         onChange={(e) => {
                           const newType = e.target.value;
                           const next = clone(assessment);
-                          const qobj = next.sections.find(s => s.id === sec.id).questions.find(qq => qq.id === q.id);
+                          const qobj = next.sections.find((s) => s.id === sec.id).questions.find((qq) => qq.id === q.id);
                           qobj.type = newType;
-                          // initialize options for choice types
                           if (newType === "single" || newType === "multi") {
                             qobj.options = qobj.options && qobj.options.length ? qobj.options : ["Option 1", "Option 2", "Option 3", "Option 4"];
-
                           } else {
                             qobj.options = undefined;
                           }
                           setAssessment(next);
                           saveAssessment(jid, next);
-                      }}>
-                        {QUESTION_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                        }}
+                      >
+                        {QUESTION_TYPES.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.label}
+                          </option>
+                        ))}
                       </select>
-                      {/* options editor for single/multi */}
+
                       {(q.type === "single" || q.type === "multi") && (
                         <div style={{ marginTop: 8 }}>
                           <div style={{ fontSize: 12, color: "#666" }}>Options (one per line)</div>
@@ -283,30 +339,28 @@ export default function Assessments() {
                             value={(q.options || []).join("\n")}
                             onChange={(e) => {
                               const next = clone(assessment);
-                              const qobj = next.sections.find(s => s.id === sec.id).questions.find(qq => qq.id === q.id);
-                              qobj.options = e.target.value.split("\n").map(s => s.trim()).filter(Boolean);
+                              const qobj = next.sections.find((s) => s.id === sec.id).questions.find((qq) => qq.id === q.id);
+                              qobj.options = e.target.value.split("\n").map((s) => s.trim()).filter(Boolean);
                               setAssessment(next);
                               saveAssessment(jid, next);
                             }}
-                            style={{ width: "100%", minHeight: 72 }}
+                            style={{ width: "100%", minHeight: 110 }}
                           />
                         </div>
                       )}
-
                     </div>
                   ))}
-                </div>
+                </FormSection>
               ))}
             </>
           ) : (
             <form onSubmit={handleSubmit}>
               {assessment.sections.map((sec) => (
-                <div key={sec.id} style={{ marginBottom: 12 }}>
-                  <h4>{sec.title}</h4>
+                <FormSection key={sec.id} title={sec.title}>
                   {sec.questions.map((q) => (
                     <QuestionPreview key={q.id} q={q} value={formValues[q.id]} onChange={(v) => handleChange(q, v)} visible={isVisible(q)} />
                   ))}
-                </div>
+                </FormSection>
               ))}
               <button type="submit">Submit Assessment</button>
             </form>

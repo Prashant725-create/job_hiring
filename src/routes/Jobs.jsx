@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
 import { fetchJobs, createJob, patchJob, reorderJob } from "../api/jobsApi";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 
 /* ---------- helpers ---------- */
 const makeSlug = (s = "") =>
@@ -123,35 +124,43 @@ function IndexView({
       </div>
 
       {loading ? <div>Loading…</div> : (
-        <div className="border rounded overflow-hidden">
-          {jobs.map((j, idx) => (
-            <div key={j.id} className="flex justify-between items-center p-3 border-b hover:bg-gray-50">
-              <div>
-                <Link to={`${j.id}`} className="text-blue-600 hover:underline font-semibold">{j.title}</Link>
-                <div className="text-sm text-gray-500">{(j.tags || []).join(", ")}</div>
-                <div className="text-xs text-gray-400">order: {j.order}</div>
-              </div>
+        <div>
+          {/* grid of cards (5 per row on wide screens) */}
+          <div className="jobs-grid">
+            {jobs.map((j, idx) => (
+              <div key={j.id} className="card-teal" style={{ padding: 12, minHeight: 120 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ maxWidth: "78%" }}>
+                    <Link to={`${j.id}`} className="text-xl" style={{ color: "var(--accent)" }}>{j.title}</Link>
+                    <div className="small-muted" style={{ marginTop: 6 }}>{(j.tags || []).join(", ")}</div>
+                    <div className="small-muted" style={{ fontSize: 12, marginTop: 8 }}>order: {j.order}</div>
+                  </div>
 
-              <div className="flex gap-2 items-center">
-                <button onClick={() => toggleArchive(j.id)} className="px-2 py-1 border rounded text-sm">
-                  {j.status === "active" ? "Archive" : "Unarchive"}
-                </button>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <button onClick={() => toggleArchive(j.id)} className="pager-button">
+                      {j.status === "active" ? "Archive" : "Unarchive"}
+                    </button>
 
-                <button onClick={() => move(j.id, -1)} disabled={idx === 0} className="px-2 py-1 border rounded text-sm">↑</button>
-                <button onClick={() => move(j.id, +1)} disabled={idx === jobs.length - 1} className="px-2 py-1 border rounded text-sm">↓</button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => move(j.id, -1)} disabled={idx === 0} className="pager-button">↑</button>
+                      <button onClick={() => move(j.id, +1)} disabled={idx === jobs.length - 1} className="pager-button">↓</button>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
 
           {jobs.length === 0 && <div className="p-4 text-gray-500">No jobs</div>}
         </div>
       )}
 
+
       {/* pagination */}
-      <div className="flex justify-center items-center gap-3 mt-4">
-        <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 bg-gray-200 rounded">Prev</button>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 12 }}>
+        <button  className="pager-button" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ padding: "6px 10px", background: "#eee", borderRadius: 6 }}>Prev</button>
         <span>Page {page} of {pages}</span>
-        <button disabled={page >= pages} onClick={() => setPage(p => Math.min(pages, p + 1))} className="px-3 py-1 bg-gray-200 rounded">Next</button>
+        <button  className="pager-button" disabled={page >= pages} onClick={() => setPage(p => Math.min(pages, p + 1))} style={{ padding: "6px 10px", background: "#eee", borderRadius: 6 }}>Next</button>
       </div>
 
       {/* create modal */}
