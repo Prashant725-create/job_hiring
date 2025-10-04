@@ -146,8 +146,37 @@ button.primary { background: var(--accent); color: white; border: none; }
 .small-muted { color: var(--muted); font-size: 0.9rem; }
 .tag-btn { display: inline-block; padding: 4px 8px; font-size: 12px; border-radius: 6px; background: var(--button-bg); border: 1px solid var(--border); color: var(--text); }
 
+.job-action-btn,
+.icon-btn {
+  color: #111;                 /* black-ish text for light mode */
+  background: var(--button-bg);
+  border-color: var(--button-border);
+}
 
+/* slightly different neutral look */
+.icon-btn {
+  padding: 0.45rem 0.6rem;
+}
 
+html.dark .job-action-btn,
+html.dark .icon-btn {
+  color: #e6eef5;              /* light, but not pure white */
+  background: rgba(255,255,255,0.03); /* subtle contrast in dark */
+  border-color: rgba(255,255,255,0.06);
+}
+
+/* Hover in dark: teal highlight */
+html.dark .job-action-btn:hover,
+html.dark .icon-btn:hover {
+  background: var(--accent);
+  color: #041217; /* dark text on teal for contrast */
+}
+
+/* Hover in light: teal border highlight */
+.job-action-btn:hover,
+.icon-btn:hover {
+  border-color: var(--accent);
+}
 
 /* keep smooth transitions */
 html, body, .app-surface, .card, button, input, textarea, select {
@@ -338,6 +367,8 @@ html.dark .theme-toggle img {
   /* only if needed — comment out if icons already fine */
   /* filter: invert(1) brightness(1.1); */
 }
+
+
 
 button.pager-button {
   color: #000 !important;            /* always black text */

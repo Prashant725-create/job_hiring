@@ -138,13 +138,28 @@ function IndexView({
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <button onClick={() => toggleArchive(j.id)} className="pager-button">
+                    <button
+                      onClick={() => toggleArchive(j.id)}
+                      className="px-2 py-1 border rounded text-sm job-action-btn"
+                    >
                       {j.status === "active" ? "Archive" : "Unarchive"}
                     </button>
 
                     <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => move(j.id, -1)} disabled={idx === 0} className="pager-button">↑</button>
-                      <button onClick={() => move(j.id, +1)} disabled={idx === jobs.length - 1} className="pager-button">↓</button>
+                      <button
+                        onClick={() => move(j.id, -1)}
+                        disabled={idx === 0}
+                        className="px-2 py-1 border rounded text-sm icon-btn"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => move(j.id, +1)}
+                        disabled={idx === jobs.length - 1}
+                        className="px-2 py-1 border rounded text-sm icon-btn"
+                      >
+                        ↓
+                      </button>
                     </div>
                   </div>
                 </div>
