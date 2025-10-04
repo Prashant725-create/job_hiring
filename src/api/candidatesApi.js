@@ -43,11 +43,12 @@ export async function fetchCandidates({ search = "", stage = "", page = 1, pageS
     });
 
     // If server returned a paginated object with results, persist them locally
-    const arr = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-    if (arr.length) {
-      try { await bulkSaveCandidates(arr); } catch (err) { console.warn("bulkSaveCandidates failed", err); }
+    if (Array.isArray(data?.results ? data.results : data)) {
+      const arr = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+      if (arr.length) {
+        try { await bulkSaveCandidates(arr); } catch (err) { console.warn("bulkSaveCandidates failed", err); }
+      }
     }
-
     return data;
   } catch (err) {
     if (err.status || err.body) throw err;
@@ -67,9 +68,7 @@ export async function createCandidate(payload) {
     });
 
     // persist
-    if (data && data.id) {
-      try { await saveCandidate(data); } catch (e) { console.warn("saveCandidate failed", e); }
-    }
+    try { await saveCandidate(data); } catch (e) { console.warn("saveCandidate failed", e); }
 
     return data;
   } catch (err) {

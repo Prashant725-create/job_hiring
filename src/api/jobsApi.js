@@ -47,9 +47,11 @@ export async function fetchJobs({
     // persist jobs locally if present (non-blocking)
     try {
       // handle both shapes: array or { results: [] }
-      const arr = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
-      if (arr.length) {
-          try { await bulkSaveJobs(arr); } catch (err) { console.warn("bulkSaveJobs failed", err); }
+      if (Array.isArray(data?.results ? data.results : data)) {
+          const arr = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+        if (arr.length) {
+            try { await bulkSaveJobs(arr); } catch (err) { console.warn("bulkSaveJobs failed", err); }
+        }
       }
       return data;
     } 
@@ -88,9 +90,7 @@ export async function createJob(body) {
     });
 
     // persist created job (non-blocking)
-    if (data && data.id) {
-      try { await saveJob(data); } catch (e) { console.warn("saveJob failed", e); }
-    }
+    try { await saveJob(data); } catch (e) { console.warn("saveJob failed", e); }
 
     return data;
   } catch (err) {

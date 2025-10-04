@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
 import { fetchJobs, createJob, patchJob, reorderJob } from "../api/jobsApi";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { getJobs as dbGetJobs } from "../db"; // name conflict, rename e.g. dbGetJobs
+import { getJobs as dbGetJobs, bulkSaveJobs } from "../db"; // name conflict, rename e.g. dbGetJobs
 
 /* ---------- helpers ---------- */
 const makeSlug = (s = "") =>
@@ -178,7 +178,7 @@ function IndexView({
               <input value={newTags} onChange={e => setNewTags(e.target.value)} className="w-full border p-2 rounded" />
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setOpenCreate(false)} className="px-3 py-1 bg-gray-200 rounded">Cancel</button>
+              <button type="button" onClick={() => setOpenCreate(false)} className="px-3 py-1 bg-black rounded">Cancel</button>
               <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded">Create</button>
             </div>
           </form>
@@ -224,14 +224,30 @@ export default function JobsPage() {
         const local = await dbGetJobs({ page, pageSize: PAGE_SIZE, status, search });
         if (local && Array.isArray(local.results) && local.results.length) {
           setJobs(local.results);
-          setTotal(local.total);
+          setTotal(local.total ?? local.results.length);
         }
 
-        // 2) fetch network to reconcile (will update DB because api client writes through)
+        // 2) fetch from network
         const server = await fetchJobs({ search, status, page, pageSize: PAGE_SIZE, sort: "order" });
         if (server && server.results) {
-          setJobs(server.results);
-          setTotal(server.total ?? server.results.length);
+          const serverResults = server.results;
+          const serverTotal = server.total ?? serverResults.length;
+
+          // 3) find jobs that exist locally but not on server (local-only new jobs)
+          const localResults = Array.isArray(local?.results) ? local.results : [];
+          const localOnly = localResults.filter(l => !serverResults.some(s => s.id === l.id));
+
+          // 4) merge local-only + server
+          const merged = [...localOnly, ...serverResults];
+
+          // 5) persist merged back into IndexedDB
+          if (merged.length) {
+            await bulkSaveJobs(merged);
+          }
+
+          // 6) update state
+          setJobs(merged);
+          setTotal(serverTotal);
         }
       } catch (err) {
         console.error("load failed", err);

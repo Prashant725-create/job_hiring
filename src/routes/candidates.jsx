@@ -277,63 +277,50 @@ export default function Candidates() {
     return () => console.log("Candidates unmounted");
   }, []);
 
-  /* loadAll: fetch candidates from server (server-like filtering by stage) */
+/* loadAll: fetch candidates from server (server-like filtering by stage) */
 async function loadAll() {
   setLoading(true);
   try {
-    // Read local first (fast UI)
-    const local = await dbGetCandidates({
-      page,
-      pageSize,
-      stage: stageFilter,
-      search,
-    });
-
+    // 1) read local first (fast)
+    const local = await dbGetCandidates({ page, pageSize, stage: stageFilter, search });
     if (local && Array.isArray(local.results)) {
       setData(local.results);
-      setTotal(typeof local.total === "number" ? local.total : (local.results.length || 0));
+      setTotal(local.total ?? local.results.length);
     }
 
-    // Then fetch fresh data from server (network)
-    const server = await fetchCandidates({
-      page,
-      pageSize,
-      stage: stageFilter,
-      search,
-    });
+    // 2) fetch server
+    const server = await fetchCandidates({ page, pageSize, stage: stageFilter, search });
 
-    // Defensive check: server returns paginated shape { results, total, ... } or an array
-    const serverResults = Array.isArray(server) ? server : server?.results ?? null;
-    if (serverResults) {
-      const tot = typeof server?.total === "number" ? server.total : serverResults.length;
-      setData(serverResults);
-      setTotal(tot);
-
-      // write-through to local DB (so subsequent loads read from local first)
-      // This is optional but recommended for offline/local persistence.
-      try {
-        if (Array.isArray(serverResults) && serverResults.length) {
-          await bulkSaveCandidates(serverResults);
-        }
-      } catch (dbErr) {
-        console.warn("Failed to persist server candidates to local DB:", dbErr);
-      }
-    } else {
-      // If server responded with unexpected shape but we already showed local data, do nothing.
-      if (!local || !Array.isArray(local.results)) {
-        console.error("loadAll: unexpected server response", server);
-        throw new Error("Invalid response from /api/candidates");
-      }
+    if (!server) {
+      // no server result — keep local
+      return;
     }
+
+    // server.results expected
+    const serverResults = Array.isArray(server) ? server : (server.results || []);
+    const serverTotal = server.total ?? (serverResults.length);
+
+    // 3) merge: keep local-only items (ids not on server)
+    const localResults = Array.isArray(local?.results) ? local.results : [];
+    const localOnly = localResults.filter(l => !serverResults.some(s => s.id === l.id));
+
+    // merged results: local-only first (if you want local created shown), then server page
+    const merged = [...localOnly, ...serverResults];
+
+    // 4) persist merged to IndexedDB (so subsequent loads reflect merged)
+    if (merged.length) {
+      await bulkSaveCandidates(merged);
+    }
+
+    // 5) update UI: show merged (or server page only if that's preferred)
+    setData(merged);
+    setTotal(serverTotal);
+
   } catch (err) {
     console.error("Failed to load candidates", err);
-    // preserve any local data if present; otherwise clear UI and show user-friendly message
-    if (!data || data.length === 0) {
-      setData([]);
-      setTotal(0);
-    }
-    // optional user-visible alert
     alert("Failed to load candidates — check console/network and MSW worker.");
+    setData([]);
+    setTotal(0);
   } finally {
     setLoading(false);
   }

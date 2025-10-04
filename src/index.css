@@ -46,6 +46,22 @@ html.dark {
   --button-border: #2b2b2b;
 }
 
+.dark label,
+.dark .form-label,
+.dark .form-heading,
+.dark h3,
+.dark h4 {
+  color: #151515;; /* near white for readability */
+}
+
+label,
+.form-label,
+.form-heading,
+h3,
+h4 {
+  color: #111; /* keep normal dark text in light mode */
+}
+
 /* ---------------- Base page & layout ---------------- */
 html, body {
   height: 100%;
